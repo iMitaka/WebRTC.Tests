@@ -1,0 +1,17 @@
+Register User: 
+
+{"name": "test", "type":"login"}
+{"name": "test2", "type":"login"}
+
+Making a Call:
+
+{"name": "test2", "type": "offer", "offer": "want to call test2"}
+
+Wrong: {"name": "test23", "type": "offer", "offer": "want to call test23"}
+
+Answer:
+
+{"name": "test", "type": "answer", "answer":"ok lets talk"}
+
+Wrong: {"name": "test23", "type": "answer", "answer":"ok lets talk23"}
+
