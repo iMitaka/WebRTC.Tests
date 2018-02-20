@@ -124,19 +124,20 @@ export default class TestConnection extends Component {
         });
 
         this.handleLeave();
+        this.forceUpdate()
     }
 
-    handleLeave() { 
+    handleLeave() {
         this.setState({
             connectedUser: null,
             remoteVideoSrc: null,
 
         })
-         
-        this.state.yourConn.close(); 
-        this.state.yourConn.onicecandidate = null; 
-        this.state.yourConn.onaddstream = null; 
-     };
+
+        this.state.yourConn.close();
+        this.state.yourConn.onicecandidate = null;
+        this.state.yourConn.onaddstream = null;
+    };
 
     handleOffer(offer, name) {
         this.setState({
@@ -178,56 +179,99 @@ export default class TestConnection extends Component {
             //********************** 
             //Starting a peer connection 
             //********************** 
-            navigator.getUserMedia = (navigator.webkitGetUserMedia || navigator.getUserMedia ||
-                navigator.mozGetUserMedia ||
-                navigator.msGetUserMedia);
+
             //getting local video stream 
-            navigator.getUserMedia({ video: true, audio: true }, function (myStream) {
-                let stream = myStream;
+            if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .then((myStream) => {
+                        let stream = myStream;
+                        //displaying local video stream on the page 
+                        this.setState({
+                            localVideoSrc: window.URL.createObjectURL(stream)
+                        })
 
-                //displaying local video stream on the page 
-                let localVideoSrc = window.URL.createObjectURL(stream);
+                        //using Google public stun server 
+                        var configuration = {
+                            "iceServers": [{ "url": "stun:stun2.1.google.com:19302" }]
+                        };
 
-                this.setState({
-                    localVideoSrc: localVideoSrc,
-                })
-                //using Google public stun server 
-                var configuration = {
-                    "iceServers": [{ "url": "stun:stun2.1.google.com:19302" }]
-                };
+                        let yourConn = new RTCPeerConnection(configuration);
 
-                let yourConn = new RTCPeerConnection(configuration);
+                        // setup stream listening 
+                        yourConn.addStream(stream);
 
-                // setup stream listening 
-                yourConn.addStream(stream);
+                        //when a remote user adds stream to the peer connection, we display it 
 
-                //when a remote user adds stream to the peer connection, we display it 
+                        yourConn.onaddstream = function (e) {
+                            this.setState({
+                                remoteVideoSrc: window.URL.createObjectURL(e.stream)
+                            })
 
-                yourConn.onaddstream = function (e) {
-                    let remoteVideoSrc = window.URL.createObjectURL(e.stream);
-                    this.setState({
-                        remoteVideoSrc: remoteVideoSrc
+                        }.bind(this);
+
+                        // Setup ice handling 
+                        yourConn.onicecandidate = function (event) {
+                            if (event.candidate) {
+                                this.send({
+                                    type: "candidate",
+                                    candidate: event.candidate
+                                });
+                            }
+                        }.bind(this);
+
+                        this.setState({
+                            yourConn: yourConn
+                        })
+
                     })
-                }.bind(this);
+                    .catch((err) => {
+                        console.log(err);
+                    });
+            } else {
+                navigator.webkitGetUserMedia({ video: true, audio: true }, function (myStream) {
+                    let stream = myStream;
 
-                // Setup ice handling 
-                yourConn.onicecandidate = function (event) {
-                    if (event.candidate) {
-                        this.send({
-                            type: "candidate",
-                            candidate: event.candidate
-                        });
-                    }
-                }.bind(this);
+                    //displaying local video stream on the page 
+                    this.setState({
+                        localVideoSrc: window.URL.createObjectURL(stream)
+                    })
 
-                this.setState({
-                    yourConn: yourConn
-                })
+                    //using Google public stun server 
+                    var configuration = {
+                        "iceServers": [{ "url": "stun:stun2.1.google.com:19302" }]
+                    };
 
-            }.bind(this), function (error) {
-                console.log(error);
-            });
+                    let yourConn = new RTCPeerConnection(configuration);
 
+                    // setup stream listening 
+                    yourConn.addStream(stream);
+
+                    //when a remote user adds stream to the peer connection, we display it 
+
+                    yourConn.onaddstream = function (e) {
+                        this.setState({
+                            remoteVideoSrc: window.URL.createObjectURL(e.stream)
+                        })
+                    }.bind(this);
+
+                    // Setup ice handling 
+                    yourConn.onicecandidate = function (event) {
+                        if (event.candidate) {
+                            this.send({
+                                type: "candidate",
+                                candidate: event.candidate
+                            });
+                        }
+                    }.bind(this);
+
+                    this.setState({
+                        yourConn: yourConn
+                    })
+
+                }.bind(this), function (error) {
+                    console.log(error);
+                });
+            }
         }
     };
 
@@ -237,7 +281,6 @@ export default class TestConnection extends Component {
         if (this.state.connectedUser) {
             message.name = this.state.connectedUser;
         }
-        console.log(this.state.conn)
         this.state.conn.send(JSON.stringify(message));
     };
 
@@ -246,8 +289,8 @@ export default class TestConnection extends Component {
         if (this.state.isLogged) {
             content = (
                 <div id="callPage" className="call-page">
-                    <video id="localVideo" src={this.state.localVideoSrc} srcObject={this.state.localVideoSrc} autoPlay></video>
-                    <video id="remoteVideo" src={this.state.remoteVideoSrc} srcObject={this.state.remoteVideoSrc} autoPlay></video>
+                    <video id="localVideo" src={this.state.localVideoSrc} autoPlay></video>
+                    <video id="remoteVideo" src={this.state.remoteVideoSrc} autoPlay></video>
 
                     <div className="row text-center">
                         <div className="col-md-12">
